@@ -1,0 +1,1322 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>피카소 AI 아틀리에 - 미술관 스타일 변환기</title>
+    <!-- Tailwind CSS 로드 -->
+    <script src="https://cdn.tailwindcss.com/3.4.17"></script>
+    <!-- Google Fonts: Noto Serif KR (미술관 느낌의 명조체) & Pretendard/Inter -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Noto+Sans+KR:wght@300;400;500;700&family=Noto+Serif+KR:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- Lucide Icons -->
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script>window.lucide || document.write('<script src="https://cdn.jsdelivr.net/npm/lucide@latest/dist/umd/lucide.min.js"><\/script>');</script>
+    <script>
+        if (window.tailwind) tailwind.config = {
+            theme: {
+                extend: {
+                    fontFamily: {
+                        sans: ['"Noto Sans KR"', 'Inter', 'sans-serif'],
+                        serif: ['"Noto Serif KR"', 'serif'],
+                    },
+                    colors: {
+                        gallery: {
+                            bg: '#F8F7F4',
+                            card: '#FFFFFF',
+                            ink: '#1C1B18',
+                            muted: '#6E6B63',
+                            border: '#E5E2DC',
+                            accent: '#C84B31', // 테라코타/장미시대 포인트
+                            blue: '#2B4C7E',   // 청색시대 포인트
+                            gold: '#D4A373'    // 액자 프레임 골드
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .hidden { display: none !important; }
+        .sr-only { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
+        /* 커스텀 스크롤바 및 미세 애니메이션 */
+        body {
+            background-color: #F8F7F4;
+            color: #1C1B18;
+        }
+        
+        /* 미술관 액자 그림자 효과 */
+        .museum-frame {
+            box-shadow: 
+                0 20px 25px -5px rgba(28, 27, 24, 0.08),
+                0 8px 10px -6px rgba(28, 27, 24, 0.04),
+                inset 0 0 0 1px rgba(28, 27, 24, 0.06);
+        }
+
+        /* 입체파 캔버스 로딩 애니메이션 */
+        @keyframes cubistRotate {
+            0% { transform: rotate(0deg) scale(1); border-radius: 12% 40% 20% 50%; }
+            33% { transform: rotate(120deg) scale(1.08); border-radius: 50% 15% 45% 20%; }
+            66% { transform: rotate(240deg) scale(0.95); border-radius: 25% 50% 15% 40%; }
+            100% { transform: rotate(360deg) scale(1); border-radius: 12% 40% 20% 50%; }
+        }
+        .cubist-loader-shape {
+            animation: cubistRotate 4s cubic-bezier(0.4, 0, 0.2, 1) infinite;
+        }
+
+        /* Before/After 비교 슬라이더 커스텀 */
+        .comparison-slider-handle {
+            touch-action: none;
+        }
+        
+        /* 체크무늬 투명 배경 패턴 */
+        .checkerboard-bg {
+            background-image: linear-gradient(45deg, #eee 25%, transparent 25%), 
+                              linear-gradient(-45deg, #eee 25%, transparent 25%), 
+                              linear-gradient(45deg, transparent 75%, #eee 75%), 
+                              linear-gradient(-45deg, transparent 75%, #eee 75%);
+            background-size: 20px 20px;
+            background-position: 0 0, 0 10px, 10px -10px, -10px 0px;
+        }
+    </style>
+</head>
+<body class="min-h-screen flex flex-col antialiased selection:bg-gallery-accent selection:text-white">
+
+    <!-- 상단 갤러리 헤더 -->
+    <header class="border-b border-gallery-border bg-white/80 backdrop-blur-md sticky top-0 z-30">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-18 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gallery-ink text-white flex items-center justify-center shadow-sm">
+                    <!-- 추상적인 피카소 스타일 눈/얼굴 아이콘 SVG -->
+                    <svg class="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8">
+                        <path d="M12 3L4 9v10l8 2 8-2V9l-8-6z" />
+                        <path d="M12 3v18" />
+                        <circle cx="8.5" cy="11.5" r="1.5" fill="currentColor" />
+                        <path d="M14.5 10.5c1.5-1 3 0 3 1s-1.5 2-3 1" />
+                        <path d="M9 16.5c1.5 1 4.5 1 6 0" />
+                    </svg>
+                </div>
+                <div>
+                    <span class="text-[11px] uppercase tracking-[0.2em] text-gallery-muted block font-medium">Musée Numérique</span>
+                    <h1 class="font-serif text-xl sm:text-2xl font-bold tracking-tight text-gallery-ink">피카소 AI 아틀리에</h1>
+                </div>
+            </div>
+            <div class="hidden sm:flex items-center gap-2 text-xs text-gallery-muted bg-gallery-bg px-3.5 py-2 rounded-full border border-gallery-border">
+                <span class="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+                <span>큐비즘 엔진 준비 완료</span>
+            </div>
+        </div>
+    </header>
+
+    <!-- 알림 메시지 토스트 (alert 대체) -->
+    <div id="toast-container" class="fixed bottom-6 right-6 z-50 flex flex-col gap-2 pointer-events-none"></div>
+
+    <!-- 메인 전시 및 작업 공간 -->
+    <main class="flex-grow max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        
+        <!-- 소개 배너 -->
+        <div class="mb-8 text-center max-w-2xl mx-auto">
+            <h2 class="font-serif text-2xl sm:text-3xl font-semibold text-gallery-ink mb-2">일상의 순간을 입체파 명화로</h2>
+            <p class="text-sm sm:text-base text-gallery-muted leading-relaxed">
+                사진을 업로드하거나 카메라로 촬영하세요. 파블로 피카소의 독창적인 시선과 시대별 화풍으로 당신의 피사체를 예술 작품으로 재탄생시킵니다.
+            </p>
+        </div>
+
+        <div class="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
+            
+            <!-- 좌측 컨트롤 패널 (입력 + 스타일 선택 + 실행 버튼) -->
+            <div class="lg:col-span-5 space-y-6">
+                
+                <!-- 1단계: 작품 소재(이미지) 선택 -->
+                <section class="bg-white rounded-2xl p-6 border border-gallery-border shadow-sm">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="font-serif text-lg font-semibold flex items-center gap-2">
+                            <span class="w-6 h-6 rounded-full bg-gallery-ink text-white text-xs font-sans flex items-center justify-center">1</span>
+                            피사체 이미지 선택
+                        </h3>
+                        <div class="flex gap-1.5">
+                            <button id="btn-mode-upload" type="button" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-gallery-ink text-white transition">
+                                파일 업로드
+                            </button>
+                            <button id="btn-mode-camera" type="button" class="px-3 py-1.5 text-xs font-medium rounded-lg bg-gallery-bg text-gallery-ink hover:bg-gallery-border/60 transition flex items-center gap-1">
+                                <i data-lucide="camera" class="w-3.5 h-3.5"></i> 카메라
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 업로드 드롭존 영역 -->
+                    <div id="upload-panel">
+                        <div id="drop-zone" class="border-2 border-dashed border-gallery-border hover:border-gallery-ink rounded-xl p-6 text-center cursor-pointer transition-all bg-gallery-bg/50 hover:bg-gallery-bg group">
+                            <input type="file" id="file-input" accept="image/*,.heic,.heif,.avif,.webp" class="sr-only" tabindex="-1">
+                            <div class="w-12 h-12 rounded-full bg-white border border-gallery-border mx-auto mb-3 flex items-center justify-center group-hover:scale-105 transition-transform shadow-sm">
+                                <i data-lucide="image-plus" class="w-6 h-6 text-gallery-ink"></i>
+                            </div>
+                            <p class="text-sm font-medium text-gallery-ink mb-1">클릭하여 사진 선택 또는 드래그 앤 드롭</p>
+                            <p class="text-xs text-gallery-muted">JPG, PNG, WEBP 지원 (권장: 인물, 반려동물, 정물)</p>
+                        </div>
+                    </div>
+
+                    <!-- 웹캠 촬영 영역 -->
+                    <div id="camera-panel" class="hidden space-y-3">
+                        <div class="relative rounded-xl overflow-hidden bg-black aspect-[4/3] flex items-center justify-center">
+                            <video id="webcam-video" autoplay playsinline class="w-full h-full object-cover transform -scale-x-100"></video>
+                            <div id="camera-placeholder" class="absolute inset-0 flex flex-col items-center justify-center text-white/70 text-xs p-4 text-center">
+                                <i data-lucide="video" class="w-8 h-8 mb-2 opacity-60"></i>
+                                <span>카메라 권한을 허용하면 실시간 화면이 표시됩니다.</span>
+                            </div>
+                        </div>
+                        <div class="flex gap-2">
+                            <button id="btn-capture" type="button" class="flex-1 py-2.5 px-4 bg-gallery-accent hover:bg-gallery-accent/90 text-white rounded-xl text-sm font-medium transition flex items-center justify-center gap-2 shadow-sm">
+                                <i data-lucide="aperture" class="w-4 h-4"></i> 현재 화면 촬영하기
+                            </button>
+                            <button id="btn-stop-camera" type="button" class="py-2.5 px-3 bg-gallery-bg hover:bg-gallery-border text-gallery-ink rounded-xl text-xs font-medium transition">
+                                닫기
+                            </button>
+                        </div>
+                        <canvas id="webcam-canvas" class="hidden"></canvas>
+                    </div>
+
+                    <!-- 기본 샘플 이미지 갤러리 -->
+                    <div class="mt-5 pt-4 border-t border-gallery-border">
+                        <p class="text-xs font-medium text-gallery-muted mb-2.5 flex items-center gap-1.5">
+                            <i data-lucide="sparkles" class="w-3.5 h-3.5 text-gallery-gold"></i>
+                            바로 테스트해볼 수 있는 큐레이션 샘플
+                        </p>
+                        <div class="grid grid-cols-3 gap-2.5" id="sample-gallery">
+                            <!-- 샘플 버튼들이 JS로 렌더링됨 -->
+                        </div>
+                    </div>
+                </section>
+
+                <!-- 2단계: 피카소 시대별 화풍 선택 -->
+                <section class="bg-white rounded-2xl p-6 border border-gallery-border shadow-sm">
+                    <h3 class="font-serif text-lg font-semibold flex items-center gap-2 mb-4">
+                        <span class="w-6 h-6 rounded-full bg-gallery-ink text-white text-xs font-sans flex items-center justify-center">2</span>
+                        피카소 화풍 프리셋
+                    </h3>
+
+                    <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="style-presets">
+                        <!-- 입체파 초상화 -->
+                        <button type="button" data-style="cubism" class="style-card active text-left p-3.5 rounded-xl border-2 border-gallery-ink bg-gallery-bg/60 transition-all relative overflow-hidden">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="text-xs font-bold px-2 py-0.5 rounded bg-amber-100 text-amber-900">1907–1917</span>
+                                <div class="flex -space-x-1">
+                                    <span class="w-3 h-3 rounded-full bg-[#D95D39] border border-white"></span>
+                                    <span class="w-3 h-3 rounded-full bg-[#2B59C3] border border-white"></span>
+                                    <span class="w-3 h-3 rounded-full bg-[#F4D35E] border border-white"></span>
+                                </div>
+                            </div>
+                            <div class="font-serif font-bold text-sm text-gallery-ink">입체파 초상화</div>
+                            <p class="text-[11px] text-gallery-muted mt-1 leading-snug">기하학적 면 분할, 다중 시점, 대담한 원색과 검은 윤곽선</p>
+                        </button>
+
+                        <!-- 청색 시대 -->
+                        <button type="button" data-style="blue" class="style-card text-left p-3.5 rounded-xl border border-gallery-border hover:border-gallery-ink/50 bg-white transition-all relative overflow-hidden">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="text-xs font-bold px-2 py-0.5 rounded bg-blue-100 text-blue-900">1901–1904</span>
+                                <div class="flex -space-x-1">
+                                    <span class="w-3 h-3 rounded-full bg-[#1D3557] border border-white"></span>
+                                    <span class="w-3 h-3 rounded-full bg-[#457B9D] border border-white"></span>
+                                    <span class="w-3 h-3 rounded-full bg-[#A8DADC] border border-white"></span>
+                                </div>
+                            </div>
+                            <div class="font-serif font-bold text-sm text-gallery-ink">청색 시대</div>
+                            <p class="text-[11px] text-gallery-muted mt-1 leading-snug">차분하고 우울한 푸른색·청록색 톤과 서정적인 붓터치</p>
+                        </button>
+
+                        <!-- 장미 시대 -->
+                        <button type="button" data-style="rose" class="style-card text-left p-3.5 rounded-xl border border-gallery-border hover:border-gallery-ink/50 bg-white transition-all relative overflow-hidden">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="text-xs font-bold px-2 py-0.5 rounded bg-rose-100 text-rose-900">1904–1906</span>
+                                <div class="flex -space-x-1">
+                                    <span class="w-3 h-3 rounded-full bg-[#E07A5F] border border-white"></span>
+                                    <span class="w-3 h-3 rounded-full bg-[#F2CC8F] border border-white"></span>
+                                    <span class="w-3 h-3 rounded-full bg-[#D4A373] border border-white"></span>
+                                </div>
+                            </div>
+                            <div class="font-serif font-bold text-sm text-gallery-ink">장미 시대</div>
+                            <p class="text-[11px] text-gallery-muted mt-1 leading-snug">따뜻한 핑크, 오렌지, 황토색 톤의 온화하고 시적인 화풍</p>
+                        </button>
+
+                        <!-- 게르니카 스타일 -->
+                        <button type="button" data-style="guernica" class="style-card text-left p-3.5 rounded-xl border border-gallery-border hover:border-gallery-ink/50 bg-white transition-all relative overflow-hidden">
+                            <div class="flex items-center justify-between mb-1.5">
+                                <span class="text-xs font-bold px-2 py-0.5 rounded bg-zinc-200 text-zinc-900">1937</span>
+                                <div class="flex -space-x-1">
+                                    <span class="w-3 h-3 rounded-full bg-[#111111] border border-white"></span>
+                                    <span class="w-3 h-3 rounded-full bg-[#6B7280] border border-white"></span>
+                                    <span class="w-3 h-3 rounded-full bg-[#E5E7EB] border border-white"></span>
+                                </div>
+                            </div>
+                            <div class="font-serif font-bold text-sm text-gallery-ink">게르니카 스타일</div>
+                            <p class="text-[11px] text-gallery-muted mt-1 leading-snug">흑백과 회색조의 강렬하고 극적인 모노크롬 표현주의</p>
+                        </button>
+                    </div>
+                </section>
+
+                <!-- 3단계: 변환 실행 버튼 -->
+                <button id="btn-transform" type="button" disabled class="w-full py-4 px-6 rounded-2xl bg-gallery-ink disabled:bg-gallery-border disabled:text-gallery-muted disabled:cursor-not-allowed hover:bg-black text-white font-medium text-base shadow-lg hover:shadow-xl transition-all flex items-center justify-center gap-2.5 cursor-pointer">
+                    <i data-lucide="palette" class="w-5 h-5"></i>
+                    <span>피카소 명화로 변환하기</span>
+                </button>
+            </div>
+
+            <!-- 우측 갤러리 이젤 / 전시 뷰어 -->
+            <div class="lg:col-span-7">
+                <div class="bg-white rounded-3xl p-5 sm:p-8 border border-gallery-border museum-frame">
+                    
+                    <!-- 뷰어 상단 컨트롤 바 -->
+                    <div class="flex flex-wrap items-center justify-between gap-3 mb-5 pb-4 border-b border-gallery-border">
+                        <div>
+                            <span id="artwork-subtitle" class="text-xs uppercase tracking-widest text-gallery-muted block">Gallery Canvas</span>
+                            <h3 id="artwork-title" class="font-serif text-lg sm:text-xl font-bold text-gallery-ink">작품 대기 중</h3>
+                        </div>
+
+                        <!-- 비교 모드 전환 탭 (결과가 있을 때 활성화) -->
+                        <div id="view-controls" class="hidden flex items-center gap-1.5 bg-gallery-bg p-1 rounded-xl border border-gallery-border">
+                            <button type="button" data-view="slider" class="view-mode-btn active px-3 py-1.5 rounded-lg text-xs font-medium bg-white text-gallery-ink shadow-sm transition">
+                                비교 슬라이더
+                            </button>
+                            <button type="button" data-view="side" class="view-mode-btn px-3 py-1.5 rounded-lg text-xs font-medium text-gallery-muted hover:text-gallery-ink transition">
+                                나란히 보기
+                            </button>
+                            <button type="button" data-view="result" class="view-mode-btn px-3 py-1.5 rounded-lg text-xs font-medium text-gallery-muted hover:text-gallery-ink transition">
+                                완성작만
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- 메인 캔버스 프레임 영역 -->
+                    <div class="relative w-full rounded-2xl overflow-hidden bg-gallery-bg border border-gallery-border min-h-[340px] sm:min-h-[460px] flex items-center justify-center">
+                        
+                        <!-- 상태 A: 초기 빈 상태 -->
+                        <div id="state-empty" class="text-center p-8 max-w-sm">
+                            <div class="w-20 h-20 mx-auto mb-4 rounded-2xl bg-white border border-gallery-border flex items-center justify-center shadow-sm">
+                                <i data-lucide="frame" class="w-9 h-9 text-gallery-muted/60"></i>
+                            </div>
+                            <h4 class="font-serif text-lg font-semibold text-gallery-ink mb-1.5">캔버스가 비어 있습니다</h4>
+                            <p class="text-xs sm:text-sm text-gallery-muted leading-relaxed">
+                                왼쪽에서 사진을 업로드하거나 큐레이션 샘플을 선택해 피카소의 붓터치를 경험해보세요.
+                            </p>
+                        </div>
+
+                        <!-- 상태 B: 원본 이미지 미리보기 (변환 전) -->
+                        <div id="state-preview" class="hidden w-full h-full flex flex-col items-center justify-center p-4">
+                            <img id="preview-image" src="" alt="업로드된 원본 이미지" class="max-h-[480px] w-auto object-contain rounded-xl shadow-md">
+                            <span class="mt-3 text-xs text-gallery-muted bg-white/90 px-3 py-1 rounded-full border border-gallery-border">
+                                원본 피사체 준비 완료 · 화풍을 선택하고 변환을 눌러주세요
+                            </span>
+                        </div>
+
+                        <!-- 상태 C: 예술적인 로딩 오버레이 -->
+                        <div id="state-loading" class="hidden absolute inset-0 z-20 bg-white/95 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center">
+                            <!-- 기하학적 입체파 로딩 그래픽 -->
+                            <div class="relative w-24 h-24 mb-6 flex items-center justify-center">
+                                <div class="absolute inset-0 bg-gallery-accent/20 cubist-loader-shape"></div>
+                                <div class="absolute inset-2 bg-gallery-blue/25 cubist-loader-shape" style="animation-delay: -1.3s;"></div>
+                                <div class="relative w-14 h-14 bg-gallery-ink text-white rounded-2xl flex items-center justify-center shadow-md">
+                                    <i data-lucide="brush" class="w-7 h-7 animate-bounce"></i>
+                                </div>
+                            </div>
+                            <h4 class="font-serif text-xl font-bold text-gallery-ink mb-2">아틀리에에서 작품 제작 중...</h4>
+                            <p id="loading-status-text" class="text-sm text-gallery-muted max-w-xs transition-opacity duration-300">
+                                피사체의 형태를 기하학적 면으로 해체하고 있습니다...
+                            </p>
+                            <div class="w-48 h-1.5 bg-gallery-border rounded-full overflow-hidden mt-5">
+                                <div class="h-full bg-gallery-ink rounded-full animate-pulse w-2/3"></div>
+                            </div>
+                        </div>
+
+                        <!-- 상태 D: 결과 뷰어 (1. 비교 슬라이더 모드) -->
+                        <div id="view-slider-container" class="hidden relative w-full select-none overflow-hidden flex items-center justify-center bg-zinc-900">
+                            <!-- 배경(After: 피카소 결과물) -->
+                            <img id="result-image-slider" src="" alt="피카소 스타일 변환 작품" class="w-full max-h-[540px] object-contain block pointer-events-none">
+                            
+                            <!-- 전경(Before: 원본 이미지 클리핑) -->
+                            <div id="before-clip-wrapper" class="absolute inset-0 overflow-hidden pointer-events-none" style="clip-path: inset(0 50% 0 0);">
+                                <img id="before-image-slider" src="" alt="원본 사진" class="w-full h-full max-h-[540px] object-contain block">
+                            </div>
+
+                            <!-- 좌/우 라벨 배지 -->
+                            <span class="absolute top-3 left-3 bg-black/65 text-white text-[11px] font-medium px-2.5 py-1 rounded-md backdrop-blur-sm pointer-events-none">원본 (Before)</span>
+                            <span class="absolute top-3 right-3 bg-gallery-accent/90 text-white text-[11px] font-medium px-2.5 py-1 rounded-md backdrop-blur-sm pointer-events-none">피카소 화풍 (After)</span>
+
+                            <!-- 드래그 핸들 라인 -->
+                            <div id="slider-divider" class="comparison-slider-handle absolute top-0 bottom-0 w-0.5 bg-white shadow-[0_0_10px_rgba(0,0,0,0.6)] cursor-ew-resize flex items-center justify-center" style="left: 50%;">
+                                <div class="w-9 h-9 rounded-full bg-white text-gallery-ink shadow-lg flex items-center justify-center border border-gallery-border transform -translate-x-0">
+                                    <i data-lucide="chevrons-left-right" class="w-4 h-4"></i>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- 상태 D: 결과 뷰어 (2. 나란히 보기 모드) -->
+                        <div id="view-side-container" class="hidden w-full p-4 grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div class="bg-white p-2.5 rounded-xl border border-gallery-border shadow-sm flex flex-col">
+                                <span class="text-[11px] font-semibold text-gallery-muted mb-2 px-1">원본 사진</span>
+                                <img id="side-before-img" src="" alt="원본" class="w-full h-64 sm:h-80 object-contain rounded-lg bg-gallery-bg">
+                            </div>
+                            <div class="bg-white p-2.5 rounded-xl border border-gallery-border shadow-sm flex flex-col">
+                                <span class="text-[11px] font-semibold text-gallery-accent mb-2 px-1">피카소 재해석 작품</span>
+                                <img id="side-after-img" src="" alt="변환 결과" class="w-full h-64 sm:h-80 object-contain rounded-lg bg-gallery-bg">
+                            </div>
+                        </div>
+
+                        <!-- 상태 D: 결과 뷰어 (3. 완성작 단독 감상 모드) -->
+                        <div id="view-result-container" class="hidden w-full p-4 flex items-center justify-center bg-zinc-900">
+                            <img id="single-result-img" src="" alt="피카소 완성작" class="max-h-[540px] w-auto object-contain rounded-lg shadow-2xl">
+                        </div>
+
+                    </div>
+
+                    <!-- 하단 작품 캡션 및 다운로드 액션 바 -->
+                    <div id="result-footer" class="hidden mt-6 pt-5 border-t border-gallery-border flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                        <div class="flex items-start gap-3">
+                            <div class="w-1 h-10 bg-gallery-ink rounded-full mt-0.5"></div>
+                            <div>
+                                <p id="caption-style-name" class="font-serif font-bold text-sm text-gallery-ink">입체파 초상화 (Cubist Portrait)</p>
+                                <p class="text-xs text-gallery-muted">Pablo Picasso Style Interpretation · AI Digital Canvas</p>
+                            </div>
+                        </div>
+
+                        <div class="flex items-center gap-2.5 w-full sm:w-auto">
+                            <button id="btn-download-jpg" type="button" class="flex-1 sm:flex-initial py-2.5 px-4 rounded-xl border border-gallery-border hover:bg-gallery-bg text-gallery-ink text-xs font-semibold transition flex items-center justify-center gap-1.5">
+                                <i data-lucide="download" class="w-4 h-4"></i> JPG 저장
+                            </button>
+                            <button id="btn-download-png" type="button" class="flex-1 sm:flex-initial py-2.5 px-5 rounded-xl bg-gallery-accent hover:bg-gallery-accent/90 text-white text-xs font-semibold shadow-sm transition flex items-center justify-center gap-1.5">
+                                <i data-lucide="download" class="w-4 h-4"></i> 고화질 PNG 다운로드
+                            </button>
+                        </div>
+                    </div>
+
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- 푸터 -->
+    <footer class="border-t border-gallery-border bg-white py-6 mt-12">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gallery-muted">
+            <p class="font-serif">피카소 AI 아틀리에 — 파블로 피카소의 예술 세계에 바치는 디지털 오마주</p>
+            <p>Rendered in your browser · Canvas Cubism Engine</p>
+        </div>
+    </footer>
+
+    <script>
+        // Lucide 아이콘 초기화
+        try { if (window.lucide) lucide.createIcons(); } catch (e) { console.warn(e); }
+
+        // ==========================================
+        // 1. 상태 관리 및 스타일 프롬프트 정의
+        // ==========================================
+        const state = {
+            sourceBase64: null,      // 순수 base64 문자열 (헤더 제외)
+            sourceMimeType: 'image/jpeg',
+            sourceDataUrl: null,     // 브라우저 표시용 data:image/... URL
+            resultDataUrl: null,     // 변환된 결과 이미지 data URL
+            selectedStyle: 'cubism', // 기본 선택 화풍
+            currentViewMode: 'slider', // 'slider' | 'side' | 'result'
+            isGenerating: false,
+            webcamStream: null
+        };
+
+        // 피카소 시대별 화풍 프롬프트 및 메타데이터
+        const PICASSO_STYLES = {
+            cubism: {
+                name: '입체파 초상화 (Cubist Portrait)',
+                subtitle: 'Synthetic & Analytical Cubism · 1907–1917',
+                prompt: 'Transform this exact photo into an authentic Pablo Picasso Cubist oil painting masterpiece. Preserve the core subject, pose, and composition of the original image, while deconstructing the face, body, or objects into bold geometric planes, fragmented facets, and multiple simultaneous perspectives (showing both profile and frontal angles). Use bold black contour outlines, rich primary and earth tones (ochre, terracotta, cobalt blue, cadmium yellow), and visible textured oil brushstrokes on canvas. Museum gallery masterpiece quality.'
+            },
+            blue: {
+                name: '청색 시대 (Blue Period)',
+                subtitle: 'Melancholic Monochrome · 1901–1904',
+                prompt: 'Repaint this exact photo in the iconic style of Pablo Picasso\'s Blue Period. Maintain the exact subject, facial features, and composition of the original image, but render the entire scene in deeply expressive, melancholic shades of Prussian blue, indigo, slate teal, and muted cyan with subtle cold highlights. Elongate forms slightly with emotional, soulful oil brushstrokes, somber lighting, and Poetic Symbolist atmosphere on textured canvas.'
+            },
+            rose: {
+                name: '장미 시대 (Rose Period)',
+                subtitle: 'Lyrical Warmth · 1904–1906',
+                prompt: 'Transform this exact photo into a painting from Pablo Picasso\'s Rose Period. Keep the original subject and composition intact, rendered with warm, tender palettes of terracotta pink, soft rose, warm orange, ochre, and earthy beige. Feature delicate, lyrical drawing lines, gentle chiaroscuro shading, and classic painterly oil textures on canvas with a poetic, nostalgic Parisian circus-era mood.'
+            },
+            guernica: {
+                name: '게르니카 스타일 (Guernica Monochrome)',
+                subtitle: 'Dramatic Expressionism · 1937',
+                prompt: 'Reinterpret this exact photo in the monumental, dramatic Cubist Expressionist style of Pablo Picasso\'s Guernica. Preserve the recognizable subject and composition from the source photo, transformed into stark monochrome black, pure white, charcoal, and newspaper-print grey tones. Use sharp angular fragmentation, dramatic high-contrast chiaroscuro, bold graphic lines, and raw emotional intensity on a large-scale matte mural canvas.'
+            }
+        };
+
+        // ==========================================
+        // 2. HTML5 Canvas 기반 고품질 큐레이션 샘플 생성
+        //    (외부 이미지 URL 차단/CORS 문제 없이 즉시 사용 가능)
+        // ==========================================
+        function createCuratedSamples() {
+            const samples = [
+                {
+                    id: 'portrait',
+                    title: '여인의 초상',
+                    draw: (ctx, w, h) => {
+                        // 따뜻한 스튜디오 배경
+                        const bg = ctx.createLinearGradient(0, 0, w, h);
+                        bg.addColorStop(0, '#E6D5B8');
+                        bg.addColorStop(1, '#B89B72');
+                        ctx.fillStyle = bg;
+                        ctx.fillRect(0, 0, w, h);
+
+                        // 창문 빛 표현
+                        ctx.fillStyle = 'rgba(255,250,240,0.35)';
+                        ctx.beginPath();
+                        ctx.moveTo(w * 0.6, 0);
+                        ctx.lineTo(w, 0);
+                        ctx.lineTo(w, h * 0.7);
+                        ctx.closePath();
+                        ctx.fill();
+
+                        // 어깨 및 의상
+                        ctx.fillStyle = '#2B3A4A';
+                        ctx.beginPath();
+                        ctx.ellipse(w * 0.5, h * 0.95, w * 0.34, h * 0.28, 0, Math.PI, 0);
+                        ctx.fill();
+
+                        // 목
+                        ctx.fillStyle = '#E0AC8B';
+                        ctx.fillRect(w * 0.44, h * 0.62, w * 0.12, h * 0.16);
+
+                        // 얼굴형
+                        ctx.fillStyle = '#F1C2A3';
+                        ctx.beginPath();
+                        ctx.ellipse(w * 0.5, h * 0.45, w * 0.17, w * 0.22, 0, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // 머리카락 (갈색 웨이브)
+                        ctx.fillStyle = '#3B2314';
+                        ctx.beginPath();
+                        ctx.arc(w * 0.5, h * 0.42, w * 0.21, Math.PI * 0.85, Math.PI * 2.15);
+                        ctx.lineTo(w * 0.72, h * 0.72);
+                        ctx.lineTo(w * 0.63, h * 0.68);
+                        ctx.lineTo(w * 0.62, h * 0.45);
+                        ctx.lineTo(w * 0.38, h * 0.45);
+                        ctx.lineTo(w * 0.37, h * 0.68);
+                        ctx.lineTo(w * 0.28, h * 0.72);
+                        ctx.closePath();
+                        ctx.fill();
+
+                        // 이목구비 (눈, 코, 입)
+                        ctx.fillStyle = '#2A1B12';
+                        ctx.beginPath();
+                        ctx.ellipse(w * 0.43, h * 0.43, 8, 5, 0, 0, Math.PI * 2);
+                        ctx.ellipse(w * 0.57, h * 0.43, 8, 5, 0, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // 눈썹
+                        ctx.strokeStyle = '#3B2314';
+                        ctx.lineWidth = 3;
+                        ctx.beginPath();
+                        ctx.moveTo(w * 0.39, h * 0.39);
+                        ctx.quadraticCurveTo(w * 0.43, h * 0.37, w * 0.47, h * 0.39);
+                        ctx.moveTo(w * 0.53, h * 0.39);
+                        ctx.quadraticCurveTo(w * 0.57, h * 0.37, w * 0.61, h * 0.39);
+                        ctx.stroke();
+
+                        // 코 그림자
+                        ctx.strokeStyle = '#C99374';
+                        ctx.lineWidth = 2.5;
+                        ctx.beginPath();
+                        ctx.moveTo(w * 0.5, h * 0.43);
+                        ctx.lineTo(w * 0.48, h * 0.51);
+                        ctx.lineTo(w * 0.51, h * 0.52);
+                        ctx.stroke();
+
+                        // 붉은 입술
+                        ctx.fillStyle = '#B84A4A';
+                        ctx.beginPath();
+                        ctx.ellipse(w * 0.5, h * 0.57, 13, 5, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                },
+                {
+                    id: 'still_life',
+                    title: '기타와 정물',
+                    draw: (ctx, w, h) => {
+                        // 벽면과 테이블
+                        ctx.fillStyle = '#D8CFC2';
+                        ctx.fillRect(0, 0, w, h * 0.65);
+                        ctx.fillStyle = '#7C583A';
+                        ctx.fillRect(0, h * 0.65, w, h * 0.35);
+
+                        // 클래식 어쿠스틱 기타 (대각선 배치)
+                        ctx.save();
+                        ctx.translate(w * 0.45, h * 0.52);
+                        ctx.rotate(-0.45);
+                        ctx.fillStyle = '#C67D3B';
+                        ctx.beginPath();
+                        ctx.arc(-45, 0, 58, 0, Math.PI * 2);
+                        ctx.arc(30, 0, 44, 0, Math.PI * 2);
+                        ctx.fill();
+                        // 사운드홀
+                        ctx.fillStyle = '#2B1B10';
+                        ctx.beginPath();
+                        ctx.arc(15, 0, 18, 0, Math.PI * 2);
+                        ctx.fill();
+                        // 넥
+                        ctx.fillStyle = '#4A2E1B';
+                        ctx.fillRect(70, -9, 130, 18);
+                        ctx.restore();
+
+                        // 도자기 화병
+                        ctx.fillStyle = '#386FA4';
+                        ctx.beginPath();
+                        ctx.ellipse(w * 0.74, h * 0.64, 34, 52, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                        ctx.fillRect(w * 0.74 - 14, h * 0.46, 28, 25);
+
+                        // 과일 (사과와 레몬)
+                        ctx.fillStyle = '#D64045';
+                        ctx.beginPath();
+                        ctx.arc(w * 0.28, h * 0.73, 24, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        ctx.fillStyle = '#F4D35E';
+                        ctx.beginPath();
+                        ctx.ellipse(w * 0.39, h * 0.76, 22, 16, 0.2, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                },
+                {
+                    id: 'cat',
+                    title: '창가의 고양이',
+                    draw: (ctx, w, h) => {
+                        // 푸른 밤하늘 창문 배경
+                        ctx.fillStyle = '#1E3246';
+                        ctx.fillRect(0, 0, w, h);
+
+                        // 달빛
+                        ctx.fillStyle = '#F6E8B1';
+                        ctx.beginPath();
+                        ctx.arc(w * 0.75, h * 0.25, 36, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // 창틀
+                        ctx.strokeStyle = '#EAE4D7';
+                        ctx.lineWidth = 10;
+                        ctx.strokeRect(20, 20, w - 40, h - 40);
+
+                        // 고양이 몸통
+                        ctx.fillStyle = '#E58F4B';
+                        ctx.beginPath();
+                        ctx.ellipse(w * 0.45, h * 0.72, 65, 85, 0, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // 고양이 머리
+                        ctx.beginPath();
+                        ctx.arc(w * 0.45, h * 0.43, 48, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        // 귀
+                        ctx.beginPath();
+                        ctx.moveTo(w * 0.34, h * 0.36);
+                        ctx.lineTo(w * 0.32, h * 0.21);
+                        ctx.lineTo(w * 0.42, h * 0.31);
+                        ctx.moveTo(w * 0.56, h * 0.36);
+                        ctx.lineTo(w * 0.58, h * 0.21);
+                        ctx.lineTo(w * 0.48, h * 0.31);
+                        ctx.fill();
+
+                        // 초록빛 눈
+                        ctx.fillStyle = '#7FB069';
+                        ctx.beginPath();
+                        ctx.ellipse(w * 0.40, h * 0.42, 9, 11, 0, 0, Math.PI * 2);
+                        ctx.ellipse(w * 0.50, h * 0.42, 9, 11, 0, 0, Math.PI * 2);
+                        ctx.fill();
+
+                        ctx.fillStyle = '#111';
+                        ctx.beginPath();
+                        ctx.ellipse(w * 0.40, h * 0.42, 3, 9, 0, 0, Math.PI * 2);
+                        ctx.ellipse(w * 0.50, h * 0.42, 3, 9, 0, 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                }
+            ];
+
+            const container = document.getElementById('sample-gallery');
+            samples.forEach(sample => {
+                const canvas = document.createElement('canvas');
+                canvas.width = 512;
+                canvas.height = 512;
+                const ctx = canvas.getContext('2d');
+                sample.draw(ctx, 512, 512);
+                const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+
+                const btn = document.createElement('button');
+                btn.type = 'button';
+                btn.className = 'group relative rounded-xl overflow-hidden border border-gallery-border hover:border-gallery-ink transition aspect-square bg-gallery-bg focus:outline-none focus:ring-2 focus:ring-gallery-ink';
+                btn.innerHTML = `
+                    <img src="${dataUrl}" alt="${sample.title}" class="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300">
+                    <div class="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/75 via-black/40 to-transparent p-1.5 text-center">
+                        <span class="text-[11px] font-medium text-white block truncate">${sample.title}</span>
+                    </div>
+                `;
+                btn.addEventListener('click', () => {
+                    loadSourceImage(dataUrl, 'image/jpeg', sample.title);
+                    showToast(`샘플 이미지 '${sample.title}'(이)가 로드되었습니다.`);
+                });
+                container.appendChild(btn);
+            });
+        }
+
+        // ==========================================
+        // 3. UI 알림(Toast) 헬퍼
+        // ==========================================
+        function showToast(message, type = 'info') {
+            const container = document.getElementById('toast-container');
+            const toast = document.createElement('div');
+            const bgClass = type === 'error' ? 'bg-red-700 text-white' : 'bg-gallery-ink text-white';
+            toast.className = `${bgClass} px-4 py-3 rounded-xl shadow-lg text-xs sm:text-sm font-medium flex items-center gap-2.5 transform translate-y-2 opacity-0 transition-all duration-300 pointer-events-auto max-w-sm`;
+            toast.innerHTML = `
+                <i data-lucide="${type === 'error' ? 'alert-circle' : 'check-circle-2'}" class="w-4 h-4 shrink-0"></i>
+                <span>${message}</span>
+            `;
+            container.appendChild(toast);
+            try { if (window.lucide) lucide.createIcons({ root: toast }); } catch (e) {}
+
+            requestAnimationFrame(() => {
+                toast.classList.remove('translate-y-2', 'opacity-0');
+            });
+
+            setTimeout(() => {
+                toast.classList.add('translate-y-2', 'opacity-0');
+                setTimeout(() => toast.remove(), 300);
+            }, 3500);
+        }
+
+        // ==========================================
+        // 4. 이미지 입력 처리 (파일 업로드, 드래그앤드롭, 웹캠)
+        // ==========================================
+        function loadSourceImage(dataUrl, mimeType, title = '업로드된 피사체') {
+            // 이미지를 적정 해상도(최대 1024px)로 리사이징하여 API 전송 최적화
+            const img = new Image();
+            img.onload = () => {
+                const maxDim = 1024;
+                let width = img.width;
+                let height = img.height;
+
+                if (width > maxDim || height > maxDim) {
+                    if (width > height) {
+                        height = Math.round((height * maxDim) / width);
+                        width = maxDim;
+                    } else {
+                        width = Math.round((width * maxDim) / height);
+                        height = maxDim;
+                    }
+                }
+
+                const canvas = document.createElement('canvas');
+                canvas.width = width;
+                canvas.height = height;
+                const ctx = canvas.getContext('2d');
+                ctx.drawImage(img, 0, 0, width, height);
+
+                const normalizedDataUrl = canvas.toDataURL('image/jpeg', 0.9);
+                state.sourceDataUrl = normalizedDataUrl;
+                state.sourceMimeType = 'image/jpeg';
+                state.sourceBase64 = normalizedDataUrl.split(',')[1];
+                state.resultDataUrl = null;
+
+                // UI 업데이트
+                document.getElementById('preview-image').src = normalizedDataUrl;
+                document.getElementById('state-empty').classList.add('hidden');
+                document.getElementById('state-preview').classList.remove('hidden');
+                
+                // 이전 결과 숨김
+                hideResultViews();
+                document.getElementById('view-controls').classList.add('hidden');
+                document.getElementById('result-footer').classList.add('hidden');
+
+                document.getElementById('artwork-subtitle').textContent = 'Original Subject';
+                document.getElementById('artwork-title').textContent = title;
+
+                // 변환 버튼 활성화
+                document.getElementById('btn-transform').disabled = false;
+            };
+            img.onerror = () => {
+                showToast('이 이미지를 열 수 없습니다. JPG 또는 PNG 형식으로 다시 시도해주세요. (아이폰 HEIC 사진은 JPG로 변환이 필요할 수 있어요)', 'error');
+            };
+            img.src = dataUrl;
+        }
+
+        function handleFileSelect(file) {
+            const okExt = /\.(jpe?g|png|webp|gif|bmp|avif|heic|heif)$/i.test((file && file.name) || '');
+            if (!file || !(((file.type || '').startsWith('image/')) || okExt)) {
+                showToast('유효한 이미지 파일(JPG, PNG 등)을 선택해주세요.', 'error');
+                return;
+            }
+            const reader = new FileReader();
+            reader.onload = (e) => {
+                loadSourceImage(e.target.result, file.type || 'image/jpeg', file.name.replace(/\.[^/.]+$/, ""));
+                showToast('사진이 캔버스에 준비되었습니다.');
+            };
+            reader.onerror = () => showToast('파일을 읽지 못했습니다. 다시 시도해주세요.', 'error');
+            reader.readAsDataURL(file);
+        }
+
+        // 드롭존 이벤트 바인딩
+        const dropZone = document.getElementById('drop-zone');
+        const fileInput = document.getElementById('file-input');
+
+        dropZone.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('click', (e) => e.stopPropagation());
+        fileInput.addEventListener('change', (e) => {
+            const f = e.target.files && e.target.files[0];
+            if (f) handleFileSelect(f);
+            e.target.value = ''; // 같은 파일을 다시 선택해도 동작하도록 초기화
+        });
+
+        // 클립보드 붙여넣기 (Ctrl/Cmd+V) 지원
+        document.addEventListener('paste', (e) => {
+            const items = (e.clipboardData && e.clipboardData.files) || [];
+            for (const f of items) {
+                if (f.type && f.type.startsWith('image/')) { handleFileSelect(f); e.preventDefault(); break; }
+            }
+        });
+
+        // 화면 어디에 놓아도 브라우저가 파일을 열어버리지 않도록 방지
+        ['dragover', 'drop'].forEach(ev => window.addEventListener(ev, (e) => { if (!dropZone.contains(e.target)) e.preventDefault(); }));
+
+        dropZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            dropZone.classList.add('border-gallery-ink', 'bg-gallery-bg');
+        });
+        dropZone.addEventListener('dragleave', () => {
+            dropZone.classList.remove('border-gallery-ink', 'bg-gallery-bg');
+        });
+        dropZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            dropZone.classList.remove('border-gallery-ink', 'bg-gallery-bg');
+            if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+                handleFileSelect(e.dataTransfer.files[0]);
+            }
+        });
+
+        // 웹캠 모드 전환 및 제어
+        const btnModeUpload = document.getElementById('btn-mode-upload');
+        const btnModeCamera = document.getElementById('btn-mode-camera');
+        const uploadPanel = document.getElementById('upload-panel');
+        const cameraPanel = document.getElementById('camera-panel');
+        const webcamVideo = document.getElementById('webcam-video');
+
+        async function startCamera() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: 'user', width: { ideal: 1024 }, height: { ideal: 768 } }, 
+                    audio: false 
+                });
+                state.webcamStream = stream;
+                webcamVideo.srcObject = stream;
+                document.getElementById('camera-placeholder').classList.add('hidden');
+            } catch (err) {
+                showToast('카메라에 접근할 수 없습니다. 브라우저 권한을 확인해주세요.', 'error');
+                switchToUploadMode();
+            }
+        }
+
+        function stopCamera() {
+            if (state.webcamStream) {
+                state.webcamStream.getTracks().forEach(track => track.stop());
+                state.webcamStream = null;
+                webcamVideo.srcObject = null;
+            }
+            document.getElementById('camera-placeholder').classList.remove('hidden');
+        }
+
+        function switchToUploadMode() {
+            stopCamera();
+            cameraPanel.classList.add('hidden');
+            uploadPanel.classList.remove('hidden');
+            btnModeUpload.className = 'px-3 py-1.5 text-xs font-medium rounded-lg bg-gallery-ink text-white transition';
+            btnModeCamera.className = 'px-3 py-1.5 text-xs font-medium rounded-lg bg-gallery-bg text-gallery-ink hover:bg-gallery-border/60 transition flex items-center gap-1';
+        }
+
+        btnModeUpload.addEventListener('click', switchToUploadMode);
+        btnModeCamera.addEventListener('click', () => {
+            uploadPanel.classList.add('hidden');
+            cameraPanel.classList.remove('hidden');
+            btnModeCamera.className = 'px-3 py-1.5 text-xs font-medium rounded-lg bg-gallery-ink text-white transition flex items-center gap-1';
+            btnModeUpload.className = 'px-3 py-1.5 text-xs font-medium rounded-lg bg-gallery-bg text-gallery-ink hover:bg-gallery-border/60 transition';
+            startCamera();
+        });
+
+        document.getElementById('btn-stop-camera').addEventListener('click', switchToUploadMode);
+
+        document.getElementById('btn-capture').addEventListener('click', () => {
+            if (!state.webcamStream) return;
+            const canvas = document.getElementById('webcam-canvas');
+            canvas.width = webcamVideo.videoWidth || 640;
+            canvas.height = webcamVideo.videoHeight || 480;
+            const ctx = canvas.getContext('2d');
+            // 좌우 반전 보정하여 자연스러운 사진으로 캡처
+            ctx.translate(canvas.width, 0);
+            ctx.scale(-1, 1);
+            ctx.drawImage(webcamVideo, 0, 0, canvas.width, canvas.height);
+
+            const dataUrl = canvas.toDataURL('image/jpeg', 0.92);
+            loadSourceImage(dataUrl, 'image/jpeg', '카메라 촬영 포트레이트');
+            switchToUploadMode();
+            showToast('카메라 촬영 이미지가 적용되었습니다.');
+        });
+
+        // ==========================================
+        // 5. 화풍 프리셋 선택 로직
+        // ==========================================
+        document.querySelectorAll('.style-card').forEach(card => {
+            card.addEventListener('click', () => {
+                document.querySelectorAll('.style-card').forEach(c => {
+                    c.classList.remove('active', 'border-2', 'border-gallery-ink', 'bg-gallery-bg/60');
+                    c.classList.add('border', 'border-gallery-border', 'bg-white');
+                });
+                card.classList.remove('border', 'border-gallery-border', 'bg-white');
+                card.classList.add('active', 'border-2', 'border-gallery-ink', 'bg-gallery-bg/60');
+                state.selectedStyle = card.dataset.style;
+            });
+        });
+
+        // ==========================================
+        // 6. 브라우저 내 피카소 화풍 변환 (Canvas)
+        // ==========================================
+        const LOADING_MESSAGES = [
+            '피사체의 형태를 기하학적 면으로 해체하고 있습니다...',
+            '다중 시점의 구도와 대담한 윤곽선을 스케치하는 중...',
+            '피카소 팔레트의 고유한 색채와 질감을 입히고 있습니다...',
+            '아틀리에 캔버스에 마지막 유화 붓터치를 더하는 중...'
+        ];
+
+                // ---------- 브라우저 내 피카소 화풍 렌더러 (외부 API 불필요) ----------
+        const STYLE_PARAMS = {
+            cubism: {
+                density: 10, angle: 0.5, stretch: 1.9, jitter: 1.0, shift: 0.7, detail: 0.5,
+                tone: 0.2, mode: 'palette', pull: 0.62, sat: 1.35, cellAlpha: 255,
+                palette: ['#C9923A','#B5532E','#2F4F8F','#E8B923','#6B6A3A','#E9DCC0','#1B1A18','#D9A27E','#7C583A','#4C7A8C'],
+                edge: 55, cellLine: [[0,0],[1,0],[2,0],[0,1],[1,1],[2,1],[1,2]], lineColor: [20,18,16], grain: 14, strokes: 1.0
+            },
+            blue: {
+                density: 26, angle: 0.15, stretch: 1.8, jitter: 0.8, shift: 0.1, detail: 0.88,
+                tone: 0.08, mode: 'ramp', keep: 0.0, gamma: 1.1, cellAlpha: 28,
+                ramp: ['#071326','#12305A','#27558A','#5A8DB5','#A9C9D8','#E0EEF0'],
+                edge: 85, cellLine: [[0,0],[1,0]], lineColor: [8,22,48], grain: 10, strokes: 2.0
+            },
+            rose: {
+                density: 24, angle: -0.2, stretch: 1.6, jitter: 0.8, shift: 0.1, detail: 0.88,
+                tone: 0.07, mode: 'ramp', keep: 0.22, gamma: 0.95, cellAlpha: 28,
+                ramp: ['#3A2020','#8C4332','#C9705A','#E5A184','#F2CDAF','#FBEBD6'],
+                edge: 90, cellLine: [[0,0],[1,0]], lineColor: [96,44,34], grain: 9, strokes: 2.0
+            },
+            guernica: {
+                density: 9, angle: 0.62, stretch: 2.0, jitter: 1.0, shift: 0.65, detail: 0.4,
+                tone: 0.1, mode: 'mono', gamma: 1.0, cellAlpha: 255,
+                levels: ['#0C0C0C','#3A3A39','#86867F','#CFCEC6','#F3F2EA'],
+                edge: 55, cellLine: [[0,0],[1,0],[0,1],[1,1],[2,1]], lineColor: [8,8,8], grain: 12, strokes: 0.6, hatch: true
+            }
+        };
+
+        function hexToRgb(h) { const n = parseInt(h.slice(1), 16); return [n >> 16 & 255, n >> 8 & 255, n & 255]; }
+        function lerpRamp(stops, v) {
+            v = Math.max(0, Math.min(1, v)) * (stops.length - 1);
+            const i = Math.min(stops.length - 2, Math.floor(v)), f = v - i;
+            return [0, 1, 2].map(k => stops[i][k] + (stops[i + 1][k] - stops[i][k]) * f);
+        }
+
+        function picassoRender(img, key) {
+            const P = STYLE_PARAMS[key];
+            const MAXD = 1024;
+            let w = img.naturalWidth || img.width, h = img.naturalHeight || img.height;
+            const sc = Math.min(1, MAXD / Math.max(w, h));
+            w = Math.max(64, Math.round(w * sc)); h = Math.max(64, Math.round(h * sc));
+
+            const src = document.createElement('canvas');
+            src.width = w; src.height = h;
+            const sctx = src.getContext('2d', { willReadFrequently: true });
+            sctx.drawImage(img, 0, 0, w, h);
+            const sd = sctx.getImageData(0, 0, w, h).data;
+
+            // 휘도 + 약한 블러 (윤곽선/레벨 계산용)
+            const lum = new Float32Array(w * h);
+            for (let i = 0, p = 0; i < w * h; i++, p += 4) lum[i] = 0.299 * sd[p] + 0.587 * sd[p + 1] + 0.114 * sd[p + 2];
+            const blur = new Float32Array(w * h);
+            for (let y = 1; y < h - 1; y++) for (let x = 1; x < w - 1; x++) {
+                const i = y * w + x;
+                blur[i] = (lum[i] * 4 + lum[i - 1] + lum[i + 1] + lum[i - w] + lum[i + w]) / 8;
+            }
+            // 오토 레벨 (2% ~ 98%)
+            const hist = new Uint32Array(256);
+            for (let i = 0; i < w * h; i++) hist[Math.min(255, lum[i] | 0)]++;
+            let acc = 0, lo = 0, hi = 255; const tot = w * h;
+            for (let v = 0; v < 256; v++) { acc += hist[v]; if (acc > tot * 0.02) { lo = v; break; } }
+            acc = 0;
+            for (let v = 255; v >= 0; v--) { acc += hist[v]; if (acc > tot * 0.02) { hi = v; break; } }
+            if (hi - lo < 30) { lo = 0; hi = 255; }
+
+            // 회전/신축된 격자 위 지터 시드 → 각진 파편(facet)
+            const s = Math.max(w, h) / P.density;
+            const ca = Math.cos(P.angle), sa = Math.sin(P.angle);
+            const toU = (x, y) => x * ca + y * sa;
+            const toV = (x, y) => (-x * sa + y * ca) * P.stretch;
+            const cs = [[0, 0], [w, 0], [0, h], [w, h]];
+            const us = cs.map(c => toU(c[0], c[1])), vs = cs.map(c => toV(c[0], c[1]));
+            const umin = Math.min(...us) - s, vmin = Math.min(...vs) - s;
+            const cols = Math.ceil((Math.max(...us) - umin) / s) + 2, rows = Math.ceil((Math.max(...vs) - vmin) / s) + 2;
+            const N = cols * rows;
+            const sU = new Float32Array(N), sV = new Float32Array(N);
+            const cdx = new Float32Array(N), cdy = new Float32Array(N), ctone = new Float32Array(N), cang = new Float32Array(N);
+            for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) {
+                const id = r * cols + c;
+                sU[id] = umin + (c + 0.5 + (Math.random() - 0.5) * P.jitter) * s;
+                sV[id] = vmin + (r + 0.5 + (Math.random() - 0.5) * P.jitter) * s;
+                cdx[id] = (Math.random() - 0.5) * 2 * P.shift * s;
+                cdy[id] = (Math.random() - 0.5) * 2 * P.shift * s;
+                ctone[id] = 1 + (Math.random() - 0.5) * 2 * P.tone;
+                cang[id] = Math.random() * Math.PI;
+            }
+
+            const idmap = new Int32Array(w * h);
+            const sumR = new Float64Array(N), sumG = new Float64Array(N), sumB = new Float64Array(N), cnt = new Uint32Array(N);
+            for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+                const u = toU(x, y), v = toV(x, y);
+                const c0 = Math.floor((u - umin) / s), r0 = Math.floor((v - vmin) / s);
+                let best = 1e18, bid = 0;
+                for (let r = r0 - 1; r <= r0 + 1; r++) {
+                    if (r < 0 || r >= rows) continue;
+                    for (let c = c0 - 1; c <= c0 + 1; c++) {
+                        if (c < 0 || c >= cols) continue;
+                        const id = r * cols + c, du = u - sU[id], dv = v - sV[id], d = du * du + dv * dv;
+                        if (d < best) { best = d; bid = id; }
+                    }
+                }
+                const i = y * w + x; idmap[i] = bid;
+                const p = i * 4;
+                sumR[bid] += sd[p]; sumG[bid] += sd[p + 1]; sumB[bid] += sd[p + 2]; cnt[bid]++;
+            }
+
+            const pal = (P.palette || []).map(hexToRgb);
+            const ramp = (P.ramp || []).map(hexToRgb);
+            const levels = (P.levels || []).map(hexToRgb);
+
+            const out = document.createElement('canvas');
+            out.width = w; out.height = h;
+            const octx = out.getContext('2d', { willReadFrequently: true });
+            const od = octx.createImageData(w, h);
+            const o = od.data;
+
+            // 윤곽선 마스크 (파편 경계 + 원본 Sobel)
+            const edge = document.createElement('canvas');
+            edge.width = w; edge.height = h;
+            const ectx = edge.getContext('2d');
+            const ed = ectx.createImageData(w, h);
+            const e = ed.data;
+
+            for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) {
+                const i = y * w + x, p = i * 4, id = idmap[i], n = cnt[id] || 1;
+                const ar = sumR[id] / n, ag = sumG[id] / n, ab = sumB[id] / n;
+                // 파편마다 어긋난 시점 → 다시점 효과
+                const sx = Math.max(0, Math.min(w - 1, (x + cdx[id]) | 0));
+                const sy = Math.max(0, Math.min(h - 1, (y + cdy[id]) | 0));
+                const q = (sy * w + sx) * 4;
+                let R = ar * (1 - P.detail) + sd[q] * P.detail;
+                let G = ag * (1 - P.detail) + sd[q + 1] * P.detail;
+                let B = ab * (1 - P.detail) + sd[q + 2] * P.detail;
+                const tone = ctone[id];
+                R *= tone; G *= tone; B *= tone;
+
+                if (P.mode === 'palette') {
+                    // 채도 강화 후 팔레트로 끌어당김
+                    const g = 0.299 * R + 0.587 * G + 0.114 * B;
+                    R = g + (R - g) * P.sat; G = g + (G - g) * P.sat; B = g + (B - g) * P.sat;
+                    let bd = 1e18, bp = pal[0];
+                    for (const c of pal) { const d = (R - c[0]) ** 2 + (G - c[1]) ** 2 + (B - c[2]) ** 2; if (d < bd) { bd = d; bp = c; } }
+                    R = R * (1 - P.pull) + bp[0] * P.pull; G = G * (1 - P.pull) + bp[1] * P.pull; B = B * (1 - P.pull) + bp[2] * P.pull;
+                } else {
+                    let L = (0.299 * R + 0.587 * G + 0.114 * B - lo) / (hi - lo);
+                    L = Math.pow(Math.max(0, Math.min(1, L)), P.gamma);
+                    if (P.mode === 'ramp') {
+                        const c = lerpRamp(ramp, L);
+                        const k = P.keep || 0;
+                        R = c[0] * (1 - k) + R * k; G = c[1] * (1 - k) + G * k; B = c[2] * (1 - k) + B * k;
+                    } else {
+                        const li = Math.min(levels.length - 1, Math.floor(L * levels.length));
+                        const c = levels[li];
+                        R = c[0]; G = c[1]; B = c[2];
+                        // 중간톤 해칭
+                        if (P.hatch && li >= 1 && li <= 3) {
+                            const a = cang[id], t = x * Math.cos(a) + y * Math.sin(a);
+                            const period = 6 + li * 2;
+                            if (((t % period) + period) % period < 1.6) { R *= 0.35; G *= 0.35; B *= 0.35; }
+                        }
+                    }
+                }
+
+                // 캔버스 질감 노이즈
+                const nz = (Math.random() - 0.5) * P.grain;
+                o[p] = Math.max(0, Math.min(255, R + nz));
+                o[p + 1] = Math.max(0, Math.min(255, G + nz));
+                o[p + 2] = Math.max(0, Math.min(255, B + nz));
+                o[p + 3] = 255;
+
+                // 파편 경계선
+                let ea = 0;
+                if (x < w - 1 && idmap[i + 1] !== id) ea = P.cellAlpha;
+                else if (y < h - 1 && idmap[i + w] !== id) ea = P.cellAlpha;
+                // 원본 윤곽 (Sobel)
+                if (x > 0 && y > 0 && x < w - 1 && y < h - 1) {
+                    const gx = -blur[i - w - 1] - 2 * blur[i - 1] - blur[i + w - 1] + blur[i - w + 1] + 2 * blur[i + 1] + blur[i + w + 1];
+                    const gy = -blur[i - w - 1] - 2 * blur[i - w] - blur[i - w + 1] + blur[i + w - 1] + 2 * blur[i + w] + blur[i + w + 1];
+                    const m = Math.sqrt(gx * gx + gy * gy);
+                    if (m > P.edge) ea = Math.max(ea, Math.min(255, (m - P.edge) * 4 + 120));
+                }
+                if (ea) { e[p] = P.lineColor[0]; e[p + 1] = P.lineColor[1]; e[p + 2] = P.lineColor[2]; e[p + 3] = ea; }
+            }
+            octx.putImageData(od, 0, 0);
+
+            // 붓터치: 파편 방향을 따라 짧은 반투명 스트로크
+            const nStrokes = Math.round((w * h / 320) * P.strokes);
+            octx.lineCap = 'round';
+            for (let k = 0; k < nStrokes; k++) {
+                const x = Math.random() * w, y = Math.random() * h;
+                const id = idmap[(y | 0) * w + (x | 0)];
+                const a = cang[id] * 0.5 + P.angle;
+                const len = 10 + Math.random() * 22;
+                const j = ((y | 0) * w + (x | 0)) * 4;
+                octx.strokeStyle = `rgba(${o[j]},${o[j + 1]},${o[j + 2]},0.22)`;
+                octx.lineWidth = 2 + Math.random() * 4;
+                octx.beginPath();
+                octx.moveTo(x, y);
+                octx.lineTo(x + Math.cos(a) * len, y + Math.sin(a) * len);
+                octx.stroke();
+            }
+
+            // 굵은 검은 윤곽선 합성
+            ectx.putImageData(ed, 0, 0);
+            for (const [ox, oy] of P.cellLine) octx.drawImage(edge, ox, oy);
+
+            return out.toDataURL('image/png');
+        }
+
+        function loadImageFromUrl(url) {
+            return new Promise((resolve, reject) => {
+                const im = new Image();
+                im.onload = () => resolve(im);
+                im.onerror = () => reject(new Error('이미지를 불러오지 못했습니다.'));
+                im.src = url;
+            });
+        }
+
+        async function transformToPicasso() {
+            if (!state.sourceDataUrl || state.isGenerating) return;
+
+            state.isGenerating = true;
+            const btnTransform = document.getElementById('btn-transform');
+            const loadingOverlay = document.getElementById('state-loading');
+            const statusText = document.getElementById('loading-status-text');
+
+            btnTransform.disabled = true;
+            loadingOverlay.classList.remove('hidden');
+
+            let msgIdx = 0;
+            statusText.textContent = LOADING_MESSAGES[0];
+            const msgInterval = setInterval(() => {
+                msgIdx = (msgIdx + 1) % LOADING_MESSAGES.length;
+                statusText.textContent = LOADING_MESSAGES[msgIdx];
+            }, 700);
+
+            try {
+                const styleConfig = PICASSO_STYLES[state.selectedStyle];
+                // 로딩 화면이 먼저 그려지도록 한 프레임 양보
+                await new Promise(r => setTimeout(r, 60));
+                const im = await loadImageFromUrl(state.sourceDataUrl);
+                const outDataUrl = picassoRender(im, state.selectedStyle);
+                state.resultDataUrl = outDataUrl;
+                renderResult(outDataUrl, styleConfig);
+                showToast('피카소 스타일의 예술 작품이 완성되었습니다!');
+            } catch (error) {
+                console.error(error);
+                showToast(error.message || '작품 변환 중 오류가 발생했습니다.', 'error');
+            } finally {
+                clearInterval(msgInterval);
+                loadingOverlay.classList.add('hidden');
+                btnTransform.disabled = false;
+                state.isGenerating = false;
+            }
+        }
+
+        document.getElementById('btn-transform').addEventListener('click', transformToPicasso);
+
+        // ==========================================
+        // 7. 결과 뷰어, 비교 슬라이더 & 다운로드 기능
+        // ==========================================
+        function hideResultViews() {
+            document.getElementById('view-slider-container').classList.add('hidden');
+            document.getElementById('view-side-container').classList.add('hidden');
+            document.getElementById('view-result-container').classList.add('hidden');
+        }
+
+        function setViewMode(mode) {
+            state.currentViewMode = mode;
+            document.querySelectorAll('.view-mode-btn').forEach(btn => {
+                if (btn.dataset.view === mode) {
+                    btn.className = 'view-mode-btn active px-3 py-1.5 rounded-lg text-xs font-medium bg-white text-gallery-ink shadow-sm transition';
+                } else {
+                    btn.className = 'view-mode-btn px-3 py-1.5 rounded-lg text-xs font-medium text-gallery-muted hover:text-gallery-ink transition';
+                }
+            });
+
+            hideResultViews();
+            if (mode === 'slider') {
+                document.getElementById('view-slider-container').classList.remove('hidden');
+            } else if (mode === 'side') {
+                document.getElementById('view-side-container').classList.remove('hidden');
+            } else {
+                document.getElementById('view-result-container').classList.remove('hidden');
+            }
+        }
+
+        document.querySelectorAll('.view-mode-btn').forEach(btn => {
+            btn.addEventListener('click', () => setViewMode(btn.dataset.view));
+        });
+
+        function renderResult(resultUrl, styleConfig) {
+            document.getElementById('state-empty').classList.add('hidden');
+            document.getElementById('state-preview').classList.add('hidden');
+
+            // 모든 뷰어 이미지 소스 동기화
+            document.getElementById('before-image-slider').src = state.sourceDataUrl;
+            document.getElementById('result-image-slider').src = resultUrl;
+            document.getElementById('side-before-img').src = state.sourceDataUrl;
+            document.getElementById('side-after-img').src = resultUrl;
+            document.getElementById('single-result-img').src = resultUrl;
+
+            // 슬라이더 중앙 초기화
+            updateSliderPosition(50);
+
+            // 컨트롤 및 캡션 표시
+            document.getElementById('view-controls').classList.remove('hidden');
+            document.getElementById('result-footer').classList.remove('hidden');
+            document.getElementById('artwork-subtitle').textContent = styleConfig.subtitle;
+            document.getElementById('artwork-title').textContent = styleConfig.name;
+            document.getElementById('caption-style-name').textContent = styleConfig.name;
+
+            setViewMode(state.currentViewMode);
+        }
+
+        // Before/After 슬라이더 드래그 인터랙션 (마우스 + 터치 지원)
+        const sliderContainer = document.getElementById('view-slider-container');
+        const beforeClip = document.getElementById('before-clip-wrapper');
+        const sliderDivider = document.getElementById('slider-divider');
+        let isDraggingSlider = false;
+
+        function updateSliderPosition(percentage) {
+            const clamped = Math.max(0, Math.min(100, percentage));
+            beforeClip.style.clipPath = `inset(0 ${100 - clamped}% 0 0)`;
+            sliderDivider.style.left = `${clamped}%`;
+        }
+
+        function handleSliderMove(clientX) {
+            const rect = sliderContainer.getBoundingClientRect();
+            if (rect.width === 0) return;
+            const pos = ((clientX - rect.left) / rect.width) * 100;
+            updateSliderPosition(pos);
+        }
+
+        sliderContainer.addEventListener('mousedown', (e) => {
+            isDraggingSlider = true;
+            handleSliderMove(e.clientX);
+        });
+        window.addEventListener('mousemove', (e) => {
+            if (!isDraggingSlider) return;
+            handleSliderMove(e.clientX);
+        });
+        window.addEventListener('mouseup', () => {
+            isDraggingSlider = false;
+        });
+
+        // 모바일 터치 지원
+        sliderContainer.addEventListener('touchstart', (e) => {
+            isDraggingSlider = true;
+            if (e.touches[0]) handleSliderMove(e.touches[0].clientX);
+        }, { passive: true });
+        window.addEventListener('touchmove', (e) => {
+            if (!isDraggingSlider || !e.touches[0]) return;
+            handleSliderMove(e.touches[0].clientX);
+        }, { passive: true });
+        window.addEventListener('touchend', () => {
+            isDraggingSlider = false;
+        });
+
+        // 저장: 뷰어의 저장 기능이 있으면 사용, 없으면 길게 누르기/우클릭 저장용 오버레이
+        function showSaveOverlay(url, ext) {
+            const old = document.getElementById('save-overlay');
+            if (old) old.remove();
+            const ov = document.createElement('div');
+            ov.id = 'save-overlay';
+            ov.style.cssText = 'position:fixed;inset:0;z-index:9999;background:rgba(28,27,24,.82);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;padding:16px;';
+            const img = document.createElement('img');
+            img.src = url;
+            img.style.cssText = 'max-width:100%;max-height:75vh;border:8px solid #D4A373;background:#fff;box-shadow:0 20px 40px rgba(0,0,0,.4);';
+            const msg = document.createElement('p');
+            msg.textContent = `이미지를 길게 누르거나(모바일) 우클릭(PC)해서 ${ext.toUpperCase()} 이미지로 저장하세요.`;
+            msg.style.cssText = 'color:#fff;font-size:14px;text-align:center;';
+            const close = document.createElement('button');
+            close.type = 'button';
+            close.textContent = '닫기';
+            close.style.cssText = 'padding:8px 22px;border-radius:10px;background:#fff;color:#1C1B18;font-size:14px;font-weight:500;';
+            close.addEventListener('click', () => ov.remove());
+            ov.addEventListener('click', (e) => { if (e.target === ov) ov.remove(); });
+            ov.append(img, msg, close);
+            document.body.appendChild(ov);
+        }
+
+        async function saveArtwork(canvas, mime, filename, dataUrl, ext) {
+            let dl = null;
+            try { dl = (window.claude && await window.claude.use('downloads')) || null; } catch (e) { dl = null; }
+            if (dl) {
+                try {
+                    const blob = await new Promise((res) => canvas.toBlob(res, mime, 0.95));
+                    if (blob) {
+                        await dl.save({ filename, data: blob });
+                        showToast(`${ext.toUpperCase()} 파일이 저장되었습니다.`);
+                        return;
+                    }
+                } catch (err) {
+                    if (err && err.code === 'declined') return;
+                }
+            }
+            showSaveOverlay(dataUrl, ext);
+        }
+
+        // 고화질 이미지 다운로드 (PNG / JPG 변환 지원)
+        function downloadArtwork(format) {
+            if (!state.resultDataUrl) return;
+            const img = new Image();
+            img.onload = () => {
+                const canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                const ctx = canvas.getContext('2d');
+                
+                if (format === 'jpeg') {
+                    ctx.fillStyle = '#FFFFFF';
+                    ctx.fillRect(0, 0, canvas.width, canvas.height);
+                }
+                ctx.drawImage(img, 0, 0);
+
+                const mime = format === 'jpeg' ? 'image/jpeg' : 'image/png';
+                const ext = format === 'jpeg' ? 'jpg' : 'png';
+                const downloadUrl = canvas.toDataURL(mime, 0.95);
+                const filename = `picasso_${state.selectedStyle}_${Date.now()}.${ext}`;
+                saveArtwork(canvas, mime, filename, downloadUrl, ext);
+            };
+            img.src = state.resultDataUrl;
+        }
+
+        document.getElementById('btn-download-png').addEventListener('click', () => downloadArtwork('png'));
+        document.getElementById('btn-download-jpg').addEventListener('click', () => downloadArtwork('jpeg'));
+
+        // 초기 샘플 갤러리 렌더링 실행
+        createCuratedSamples();
+    </script>
+</body>
+</html>
